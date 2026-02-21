@@ -1,0 +1,18 @@
+[package]
+name        = "dt-core"
+version     = "0.1.0"
+edition     = "2024"
+description = "Core types, time model, and RNG primitives for the rust_dt digital twin framework."
+
+[features]
+default = []
+# Enable serde derives on all public types (required for dt-checkpoint).
+serde = ["dep:serde"]
+
+[dependencies]
+rand      = { workspace = true }
+thiserror = { workspace = true }
+
+[dependencies.serde]
+workspace = true
+optional  = true

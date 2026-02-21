@@ -1,0 +1,11 @@
+[package]
+name        = "dt-behavior"
+version     = "0.1.0"
+edition     = "2024"
+description = "Agent behavior model trait, intent types, and simulation context for the rust_dt framework."
+
+[dependencies]
+dt-core     = { path = "../dt-core" }
+dt-agent    = { path = "../dt-agent" }
+dt-schedule = { path = "../dt-schedule" }
+thiserror   = { workspace = true }

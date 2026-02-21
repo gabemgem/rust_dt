@@ -1,0 +1,27 @@
+[package]
+name    = "dt-output"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+sqlite  = ["dep:rusqlite"]
+parquet = ["dep:arrow", "dep:parquet"]
+
+[dependencies]
+dt-core     = { path = "../dt-core" }
+dt-agent    = { path = "../dt-agent" }
+dt-mobility = { path = "../dt-mobility" }
+dt-sim      = { path = "../dt-sim" }
+csv         = { workspace = true }
+thiserror   = { workspace = true }
+rusqlite    = { workspace = true, optional = true }
+arrow       = { workspace = true, optional = true }
+parquet     = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile    = "3"
+rusqlite    = { workspace = true }
+dt-behavior = { path = "../dt-behavior" }
+dt-schedule = { path = "../dt-schedule" }
+dt-spatial  = { path = "../dt-spatial" }

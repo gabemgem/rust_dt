@@ -1,0 +1,12 @@
+[package]
+name        = "dt-mobility"
+version     = "0.1.0"
+edition     = "2024"
+description = "Agent movement state, mobility engine, and route tracking for the rust_dt framework."
+
+[dependencies]
+dt-core     = { path = "../dt-core" }
+dt-agent    = { path = "../dt-agent" }
+dt-spatial  = { path = "../dt-spatial" }
+dt-behavior = { path = "../dt-behavior" }
+thiserror   = { workspace = true }

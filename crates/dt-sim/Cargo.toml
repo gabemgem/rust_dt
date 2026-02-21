@@ -1,0 +1,21 @@
+[package]
+name        = "dt-sim"
+version     = "0.1.0"
+edition     = "2024"
+description = "Tick loop orchestrator — intent phase, apply phase, mobility, and wake queue — for the rust_dt framework."
+
+[features]
+default  = []
+# Enable Rayon parallel intent phase.  Requires that BehaviorModel is Sync
+# (it already is — the trait bound is Send + Sync + 'static).
+parallel = ["dep:rayon"]
+
+[dependencies]
+dt-core     = { path = "../dt-core" }
+dt-agent    = { path = "../dt-agent" }
+dt-spatial  = { path = "../dt-spatial" }
+dt-schedule = { path = "../dt-schedule" }
+dt-behavior = { path = "../dt-behavior" }
+dt-mobility = { path = "../dt-mobility" }
+thiserror   = { workspace = true }
+rayon       = { workspace = true, optional = true }

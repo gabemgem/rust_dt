@@ -1,0 +1,17 @@
+[package]
+name        = "dt-schedule"
+version     = "0.1.0"
+edition     = "2024"
+description = "Agent activity schedules, wake-queue, and CSV loading for the rust_dt framework."
+
+[features]
+default = []
+# Propagate serde derives to dt-core types embedded in schedule structs.
+serde = ["dt-core/serde"]
+
+[dependencies]
+dt-core   = { path = "../dt-core" }
+csv       = { workspace = true }
+thiserror = { workspace = true }
+# Always-on: required by the CSV loader (serde Deserialize on ScheduleRecord).
+serde = { workspace = true }

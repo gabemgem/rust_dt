@@ -1,0 +1,19 @@
+[package]
+name    = "mobile-al"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "mobile_al"
+path = "src/main.rs"
+
+[dependencies]
+dt-agent    = { path = "../../crates/dt-agent" }
+dt-behavior = { path = "../../crates/dt-behavior" }
+dt-core     = { path = "../../crates/dt-core" }
+dt-output   = { path = "../../crates/dt-output" }
+dt-schedule = { path = "../../crates/dt-schedule" }
+dt-sim      = { path = "../../crates/dt-sim" }
+dt-mobility = { path = "../../crates/dt-mobility" }
+dt-spatial  = { path = "../../crates/dt-spatial" }
+anyhow      = "1"

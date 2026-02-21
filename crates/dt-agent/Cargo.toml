@@ -1,0 +1,23 @@
+[package]
+name        = "dt-agent"
+version     = "0.1.0"
+edition     = "2024"
+description = "Structure-of-Arrays agent storage and component system for the rust_dt framework."
+
+[features]
+default = []
+# Enables node_id / edge_id / edge_progress SoA arrays.
+spatial  = []
+# Enables next_event_tick / current_activity SoA arrays.
+schedule = []
+# Enables transport_mode SoA array.
+mobility = []
+# Propagates serde derives to all public types.
+serde = ["dep:serde", "dt-core/serde"]
+
+[dependencies]
+dt-core = { path = "../dt-core" }
+
+[dependencies.serde]
+workspace = true
+optional  = true

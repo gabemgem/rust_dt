@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "crates/dt-core",
+    "crates/dt-agent",
+    "crates/dt-spatial",
+    "crates/dt-schedule",
+    "crates/dt-behavior",
+    "crates/dt-mobility",
+    "crates/dt-sim",
+    "crates/dt-output",
+    "examples/mobile_al",
+    "examples/large",
+    "examples/xlarge",
+]
+resolver = "2"
+
+# Workspace-level dependency versions — sub-crates reference these to stay in sync.
+[workspace.dependencies]
+rand        = { version = "0.8", features = ["small_rng"] }
+thiserror   = "1"
+serde       = { version = "1", features = ["derive"] }
+rstar       = "0.12"
+csv         = "1"
+rayon       = "1"
+rusqlite    = { version = "0.31", features = ["bundled"] }
+arrow       = "53"
+parquet     = { version = "53", features = ["arrow"] }

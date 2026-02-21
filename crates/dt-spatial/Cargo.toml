@@ -1,0 +1,25 @@
+[package]
+name        = "dt-spatial"
+version     = "0.1.0"
+edition     = "2024"
+description = "Road network graph, spatial indexing, and routing for the rust_dt framework."
+
+[features]
+default = []
+# Enable OSM PBF loading via osmpbf.
+osm  = ["dep:osmpbf"]
+# Propagate serde derives.
+serde = ["dep:serde", "dt-core/serde"]
+
+[dependencies]
+dt-core   = { path = "../dt-core" }
+rstar     = { workspace = true }
+thiserror = { workspace = true }
+
+[dependencies.osmpbf]
+version  = "0.3"
+optional = true
+
+[dependencies.serde]
+workspace = true
+optional  = true
