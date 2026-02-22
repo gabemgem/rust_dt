@@ -19,8 +19,6 @@ use crate::{SimObserver, SimResult};
 struct AgentInputs {
     /// Messages waiting in the queue for this agent (drained this tick).
     messages: Vec<(AgentId, Vec<u8>)>,
-    /// Agents co-located at the same road node this tick.
-    contacts: Vec<ContactEvent>,
 }
 
 // ── Sim ───────────────────────────────────────────────────────────────────────
@@ -158,9 +156,16 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
 
         // ── Phase 3: pre-collect per-agent inputs (sequential) ────────────
         //
-        // Drain each woken agent's pending messages and build their contact
-        // list BEFORE the intent phase so the intent phase (which may run in
-        // parallel) only reads immutable data.
+        // Drain each woken agent's pending messages BEFORE the intent phase
+        // so the intent phase (which may run in parallel) only reads
+        // immutable data.
+        //
+        // Contact lists are NOT collected here.  Instead, `contacts_for_agent`
+        // is called lazily inside `compute_intents` — one ephemeral Vec per
+        // agent, created and dropped within the same closure.  This keeps
+        // peak memory O(threads × contacts_per_agent) rather than
+        // O(woken × contacts_per_agent), which is critical when many agents
+        // share a small number of nodes.
         //
         // Messages sent *this tick* (during the apply phase below) will be
         // delivered at the recipient's *next* wake — not this one.
@@ -168,15 +173,12 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
             .iter()
             .map(|&agent| {
                 let messages = self.message_queue.remove(&agent).unwrap_or_default();
-                let contacts = contacts_for_agent(
-                    agent, &contact_index, &self.mobility.store, now,
-                );
-                AgentInputs { messages, contacts }
+                AgentInputs { messages }
             })
             .collect();
 
         // ── Phase 4: intent phase (produce) ───────────────────────────────
-        let intents = self.compute_intents(now, &woken, inputs);
+        let intents = self.compute_intents(now, &woken, inputs, contact_index);
 
         // ── Phase 5: apply phase (consume) ────────────────────────────────
         //
@@ -197,9 +199,10 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
     /// thread pool.
     fn compute_intents(
         &mut self,
-        now:    Tick,
-        woken:  &[AgentId],
-        inputs: Vec<AgentInputs>,
+        now:           Tick,
+        woken:         &[AgentId],
+        inputs:        Vec<AgentInputs>,
+        contact_index: HashMap<NodeId, Vec<AgentId>>,
     ) -> Vec<(AgentId, Vec<Intent>)> {
         // Explicit field borrows so the borrow checker sees disjoint access.
         let agents   = &self.agents;
@@ -207,6 +210,7 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
         let tick_dur = self.config.tick_duration_secs;
         let behavior = &self.behavior;
         let rngs     = &mut self.rngs;
+        let mobility = &self.mobility.store;
 
         let ctx = SimContext::new(now, tick_dur, agents, plans);
 
@@ -222,8 +226,11 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
                     for (from, payload) in input.messages {
                         intents.extend(behavior.on_message(agent, from, &payload, &ctx, rng));
                     }
-                    if !input.contacts.is_empty() {
-                        intents.extend(behavior.on_contacts(agent, &input.contacts, &ctx, rng));
+                    // Contacts are materialised lazily here — the Vec is
+                    // created, used, and dropped within this closure.
+                    let contacts = contacts_for_agent(agent, &contact_index, mobility, now);
+                    if !contacts.is_empty() {
+                        intents.extend(behavior.on_contacts(agent, &contacts, &ctx, rng));
                     }
 
                     (agent, intents)
@@ -249,8 +256,11 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
                     for (from, payload) in input.messages {
                         intents.extend(behavior.on_message(agent, from, &payload, &ctx, rng));
                     }
-                    if !input.contacts.is_empty() {
-                        intents.extend(behavior.on_contacts(agent, &input.contacts, &ctx, rng));
+                    // Contacts are materialised lazily here — the Vec is
+                    // created, used, and dropped within this Rayon task.
+                    let contacts = contacts_for_agent(agent, &contact_index, mobility, now);
+                    if !contacts.is_empty() {
+                        intents.extend(behavior.on_contacts(agent, &contacts, &ctx, rng));
                     }
 
                     (agent, intents)
@@ -287,12 +297,30 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
                         self.config.tick_duration_secs,
                         &self.network,
                     ) {
-                        Ok(arrival_tick) => {
-                            self.wake_queue.push(arrival_tick, agent);
+                        Ok(_arrival_tick) => {
+                            // Do NOT push arrival_tick to the wake queue.
+                            //
+                            // `tick_arrivals()` runs at the start of every
+                            // tick and re-schedules arrived agents via their
+                            // plan's `next_wake_tick`.  Pushing here would
+                            // create a second wake at the arrival tick,
+                            // causing a spurious re-plan that emits another
+                            // TravelTo(same_node), which cascades: each cycle
+                            // doubles the duplicate queue entries.
                         }
                         Err(_e) => {
-                            // Routing failure is non-fatal: agent stays put.
-                            // TODO: surface via a dedicated observer hook.
+                            // Routing failure: agent stays put (never enters
+                            // transit), so `tick_arrivals` will never fire.
+                            // Re-schedule via the plan so the agent wakes at
+                            // its next activity rather than silently vanishing.
+                            // This handles the common TravelTo(current_node)
+                            // at a cycle boundary (e.g. "go home" when the
+                            // router has no same-node route cached).
+                            if let Some(next_wake) =
+                                self.plans[agent.index()].next_wake_tick(now)
+                            {
+                                self.wake_queue.push(next_wake, agent);
+                            }
                         }
                     }
                 }

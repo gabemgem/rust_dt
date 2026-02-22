@@ -1,8 +1,8 @@
-//! `large` — 1 M agent daily commute over a 7×7 Atlanta metro road network.
+//! `large` — agent daily commute over a 100×100 Atlanta metro road network.
 //!
-//! Agents are split across 21 residential nodes (west side) and commute to
-//! 21 commercial nodes (east side) on a staggered 3-way schedule.
-//! Snapshots of 1-in-20 agents (50 K visible) are written every 8 ticks.
+//! Agents are split across 100 residential nodes (column 0, west side) and
+//! commute to 100 commercial nodes (column 99, east side) on a staggered
+//! 3-way schedule.  Snapshots of 1-in-20 agents are written every 8 ticks.
 //!
 //! Run with:
 //!   cargo run -p large --release
@@ -18,6 +18,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::Result;
+use memory_stats::memory_stats;
 
 use dt_agent::{AgentStore, AgentStoreBuilder};
 use dt_behavior::{BehaviorModel, Intent, SimContext};
@@ -29,6 +30,14 @@ use dt_sim::{SimBuilder, SimObserver};
 use dt_spatial::{DijkstraRouter, RoadNetwork, Route, Router, SpatialError};
 
 use network::{build_network, home_nodes, work_nodes};
+
+// ── Memory helper ─────────────────────────────────────────────────────────────
+
+fn mem_mb() -> f64 {
+    memory_stats()
+        .map(|s| s.physical_mem as f64 / (1024.0 * 1024.0))
+        .unwrap_or(0.0)
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -147,14 +156,26 @@ impl SimObserver for SampledObserver {
     fn on_tick_end(&mut self, tick: Tick, woken: usize) {
         if woken > 0 {
             self.total_wakeups += woken as u64;
-            let elapsed = self.start.elapsed().as_secs_f64();
+        }
+        let elapsed = self.start.elapsed().as_secs_f64();
+        let mem = mem_mb();
+        if woken > 0 {
             println!(
-                "  day {:2}  tick {:4}  woken={:>12}  {:.3}s  ({:.1} M/s)",
+                "  day {:2}  tick {:4}  woken={:>12}  {:.3}s  ({:.1} M/s)  mem={:.0} MB",
                 tick.0 / TICKS_PER_DAY + 1,
                 tick.0,
                 woken,
                 elapsed,
                 self.total_wakeups as f64 / elapsed / 1_000_000.0,
+                mem,
+            );
+        } else {
+            println!(
+                "  day {:2}  tick {:4}  (idle)                     {:.3}s               mem={:.0} MB",
+                tick.0 / TICKS_PER_DAY + 1,
+                tick.0,
+                elapsed,
+                mem,
             );
         }
 
@@ -221,10 +242,11 @@ fn make_plan(depart_home: u32, depart_work: u32) -> ActivityPlan {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
-    println!("=== rust_dt  large — 1 M agent commute (Atlanta 7×7 grid) ===");
+    println!("=== rust_dt  large — 1 M agent commute (Atlanta 100x100 grid) ===");
     println!(
         "Agents: {AGENT_COUNT}  |  Days: {SIM_DAYS}  |  Seed: {SEED}  |  parallel: enabled"
     );
+    println!("mem[startup]              {:.0} MB", mem_mb());
     println!();
 
     // 1. Road network.
@@ -278,6 +300,7 @@ fn main() -> Result<()> {
         .collect();
 
     println!("Build (store + plans): {:.2}s", t_build.elapsed().as_secs_f64());
+    println!("mem[after build]          {:.0} MB", mem_mb());
     println!();
 
     // 6. Sim config.
@@ -314,11 +337,15 @@ fn main() -> Result<()> {
         total_wakeups:      0,
     };
 
+    println!("mem[before run]           {:.0} MB", mem_mb());
+    println!();
+
     // 9. Run.
     sim.run(&mut obs)?;
 
     let elapsed = obs.start.elapsed().as_secs_f64();
     println!();
+    println!("mem[after run]            {:.0} MB", mem_mb());
     println!("Simulation complete in {:.3}s", elapsed);
     println!(
         "Throughput: {:.1} M wakeups/s  (total {})",

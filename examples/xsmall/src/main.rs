@@ -11,6 +11,8 @@ use std::io::Cursor;
 use std::path::Path;
 use std::time::Instant;
 
+use memory_stats::memory_stats;
+
 use anyhow::Result;
 
 use dt_agent::AgentStoreBuilder;
@@ -30,6 +32,14 @@ const SEED:                  u64   = 42;
 const TICK_DURATION_SECS:    u32   = 3_600; // 1 tick = 1 hour
 const SIM_DAYS:              u64   = 7;
 const OUTPUT_INTERVAL_TICKS: u64   = 1;     // snapshot every tick (captures commute movement)
+
+// ── Memory helper ─────────────────────────────────────────────────────────────
+
+fn mem_mb() -> f64 {
+    memory_stats()
+        .map(|s| s.physical_mem as f64 / (1024.0 * 1024.0))
+        .unwrap_or(0.0)
+}
 
 // ── Application components ────────────────────────────────────────────────────
 
@@ -126,6 +136,7 @@ impl<W: dt_output::writer::OutputWriter> CountingObserver<W> {
 impl<W: dt_output::writer::OutputWriter> SimObserver for CountingObserver<W> {
     fn on_tick_end(&mut self, tick: dt_core::Tick, woken: usize) {
         self.summary_rows += 1;
+        println!("  tick {:4}  woken={:>4}  mem={:.1} MB", tick.0, woken, mem_mb());
         self.inner.on_tick_end(tick, woken);
     }
 
@@ -150,6 +161,7 @@ fn main() -> Result<()> {
     println!("=== xsmall — rust_dt digital twin ===");
     println!("Agents: {AGENT_COUNT}  |  Days: {SIM_DAYS}  |  Seed: {SEED}");
     println!("(Scale to ~400 K agents + real OSM network for production run)");
+    println!("mem[startup]       {:.1} MB", mem_mb());
     println!();
 
     // 1. Build road network.
@@ -209,6 +221,8 @@ fn main() -> Result<()> {
     );
     println!();
 
+    println!("mem[before sim build] {:.1} MB", mem_mb());
+
     // 6. Build sim.
     let mut sim = SimBuilder::new(config.clone(), store, rngs, DailyCommuteBehavior, DijkstraRouter)
         .plans(plans)
@@ -222,10 +236,15 @@ fn main() -> Result<()> {
     let inner_obs = SimOutputObserver::new(writer, &config);
     let mut obs = CountingObserver::new(inner_obs);
 
+    println!("mem[before run]    {:.1} MB", mem_mb());
+    println!();
+
     // 8. Run.
     let t0 = Instant::now();
     sim.run(&mut obs)?;
     let elapsed = t0.elapsed();
+    println!();
+    println!("mem[after run]     {:.1} MB", mem_mb());
 
     if let Some(e) = obs.inner.take_error() {
         eprintln!("output error: {e}");
