@@ -146,7 +146,7 @@ impl<B: BehaviorModel, R: Router> SimBuilder<B, R> {
             }
         }
 
-        Ok(Sim {
+        let sim = Sim {
             clock:         self.config.make_clock(),
             config:        self.config,
             agents:        self.agents,
@@ -157,6 +157,7 @@ impl<B: BehaviorModel, R: Router> SimBuilder<B, R> {
             behavior:      self.behavior,
             network,
             message_queue: HashMap::new(),
-        })
+        };
+        Ok(sim)
     }
 }

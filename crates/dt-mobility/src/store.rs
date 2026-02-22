@@ -40,6 +40,7 @@ impl MobilityStore {
     /// # Errors
     ///
     /// Returns `SpatialError` if the router cannot find a path.
+    #[allow(clippy::too_many_arguments)]
     pub fn begin_travel<R: Router>(
         &mut self,
         agent:              AgentId,

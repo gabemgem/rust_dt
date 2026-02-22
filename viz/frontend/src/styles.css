@@ -1,0 +1,218 @@
+/* ── CSS variables (dark theme) ──────────────────────────────────────────── */
+:root {
+  --bg:        #0f0f1a;
+  --surface:   #1a1a2e;
+  --border:    #2a2a4a;
+  --text:      #e0e0e0;
+  --muted:     #888;
+  --accent:    #4fc3f7;
+  --danger:    #ef5350;
+  --ctrl-h:    52px;
+}
+
+/* ── Reset / base ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  flex-direction: column;
+  width: 100%; height: 100%;
+}
+
+.status-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 12px;
+  color: var(--accent);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.error-bar {
+  background: #3b0000;
+  border-bottom: 1px solid var(--danger);
+  padding: 4px 12px;
+  color: #ff8a80;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.map-pane {
+  flex: 0 0 65%;
+  position: relative;
+  overflow: hidden;
+}
+
+.right-pane {
+  flex: 0 0 35%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+/* ── Controls bar ────────────────────────────────────────────────────────── */
+.controls-bar {
+  flex-shrink: 0;
+  height: var(--ctrl-h);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0 16px;
+}
+
+/* Example selector */
+.example-select {
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* Mode toggle */
+.mode-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mode-toggle button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-toggle button.active,
+.mode-toggle button:hover {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Play button */
+.play-btn {
+  background: var(--accent);
+  border: none;
+  color: #000;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s;
+}
+
+.play-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* Run sim button (wider pill shape for the text label) */
+.run-btn {
+  background: var(--accent);
+  border: none;
+  color: #000;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 17px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.run-btn:hover { opacity: 0.85; }
+
+/* Scrubber */
+.scrubber {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+}
+
+/* Tick label */
+.tick-label {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Speed select */
+.speed-select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* ── Chart pane ──────────────────────────────────────────────────────────── */
+.chart-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.chart-box {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 10px 4px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-box canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.doughnut-box canvas {
+  max-height: 140px;
+}
+
+.chart-title {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

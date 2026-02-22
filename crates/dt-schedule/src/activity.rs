@@ -23,6 +23,8 @@
 //! begins moving.  The application is responsible for populating per-agent
 //! home/work `NodeId`s (typically from the population CSV).
 
+use std::sync::Arc;
+
 use dt_core::{ActivityId, NodeId, Tick};
 
 // ── Destination ───────────────────────────────────────────────────────────────
@@ -85,11 +87,19 @@ pub struct ScheduledActivity {
 ///
 /// Activities are stored sorted by `start_offset_ticks` so that lookups are
 /// O(log n) binary searches.
+///
+/// Internally the activity list is reference-counted (`Arc<[ScheduledActivity]>`)
+/// so that `clone()` is O(1).  This makes it cheap to share the same schedule
+/// across many agents (e.g. all agents in the same commuter group can clone a
+/// single template plan without any extra heap allocation).
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ActivityPlan {
     /// Activities, sorted ascending by `start_offset_ticks`.
-    activities: Vec<ScheduledActivity>,
+    ///
+    /// Using `Arc<[T]>` rather than `Vec<T>` so that `Clone` is a cheap
+    /// atomic reference-count increment instead of a deep copy.
+    activities: Arc<[ScheduledActivity]>,
     /// Length of one schedule cycle in ticks (e.g. 168 = 1 week @ 1 hr/tick).
     pub cycle_ticks: u32,
 }
@@ -110,12 +120,12 @@ impl ActivityPlan {
             "all start_offset_ticks must be < cycle_ticks"
         );
         activities.sort_unstable_by_key(|a| a.start_offset_ticks);
-        Self { activities, cycle_ticks }
+        Self { activities: activities.into(), cycle_ticks }
     }
 
     /// An empty plan with no scheduled activities.
     pub fn empty() -> Self {
-        Self { activities: Vec::new(), cycle_ticks: 1 }
+        Self { activities: Arc::from([]), cycle_ticks: 1 }
     }
 
     pub fn is_empty(&self) -> bool {

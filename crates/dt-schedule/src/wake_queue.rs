@@ -42,14 +42,36 @@ impl WakeQueue {
     ///
     /// Each agent is scheduled to wake at `plan.next_wake_tick(sim_start)`.
     /// Agents with empty plans are not inserted.
+    ///
+    /// Uses a two-pass approach to pre-allocate each `Vec<AgentId>` at the
+    /// exact required capacity.  This avoids repeated doubling reallocations
+    /// that can fail due to heap fragmentation when `plans.len()` is large
+    /// (e.g. 1 M+ agents where many are mapped to the same few wake ticks).
     pub fn build_from_plans(plans: &[ActivityPlan], sim_start: Tick) -> Self {
-        let mut queue = Self::new();
-        for (i, plan) in plans.iter().enumerate() {
+        // Pass 1: count how many agents wake at each distinct tick.
+        let mut counts: BTreeMap<Tick, usize> = BTreeMap::new();
+        for plan in plans {
             if let Some(wake) = plan.next_wake_tick(sim_start) {
-                queue.push(wake, AgentId(i as u32));
+                *counts.entry(wake).or_insert(0) += 1;
             }
         }
-        queue
+        // Pre-allocate each Vec at the exact required capacity.
+        let mut inner: BTreeMap<Tick, Vec<AgentId>> = BTreeMap::new();
+        for (t, n) in counts {
+            inner.insert(t, Vec::with_capacity(n));
+        }
+
+        // Pass 2: fill the pre-allocated Vecs.
+        let mut total = 0usize;
+        for (i, plan) in plans.iter().enumerate() {
+            if let Some(wake) = plan.next_wake_tick(sim_start) {
+                // SAFETY: key was inserted in pass 1.
+                inner.get_mut(&wake).unwrap().push(AgentId(i as u32));
+                total += 1;
+            }
+        }
+
+        Self { inner, total }
     }
 
     /// Schedule `agent` to wake at `tick`.

@@ -1,11 +1,16 @@
 [package]
-name    = "mobile-al"
-version = "0.1.0"
-edition = "2024"
+name        = "xsmall"
+version     = "0.1.0"
+edition     = "2024"
+default-run = "xsmall"
 
 [[bin]]
-name = "mobile_al"
+name = "xsmall"
 path = "src/main.rs"
+
+[[bin]]
+name = "export_nodes"
+path = "src/export_nodes.rs"
 
 [dependencies]
 dt-agent    = { path = "../../crates/dt-agent" }
@@ -17,3 +22,4 @@ dt-sim      = { path = "../../crates/dt-sim" }
 dt-mobility = { path = "../../crates/dt-mobility" }
 dt-spatial  = { path = "../../crates/dt-spatial" }
 anyhow      = "1"
+serde_json  = "1"

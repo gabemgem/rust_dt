@@ -98,7 +98,7 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
             let woken = self.process_tick(now)?;
             observer.on_tick_end(now, woken);
             if self.config.output_interval_ticks > 0
-                && now.0 % self.config.output_interval_ticks == 0
+                && now.0.is_multiple_of(self.config.output_interval_ticks)
             {
                 observer.on_snapshot(now, &self.mobility.store, &self.agents);
             }
@@ -119,7 +119,7 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
             let woken = self.process_tick(now)?;
             observer.on_tick_end(now, woken);
             if self.config.output_interval_ticks > 0
-                && now.0 % self.config.output_interval_ticks == 0
+                && now.0.is_multiple_of(self.config.output_interval_ticks)
             {
                 observer.on_snapshot(now, &self.mobility.store, &self.agents);
             }

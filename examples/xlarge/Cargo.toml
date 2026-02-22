@@ -1,17 +1,26 @@
 [package]
-name    = "xlarge"
-version = "0.1.0"
-edition = "2024"
+name        = "xlarge"
+version     = "0.1.0"
+edition     = "2024"
+default-run = "xlarge"
 
 [[bin]]
 name = "xlarge"
 path = "src/main.rs"
 
+[[bin]]
+name = "xlarge_export_nodes"
+path = "src/export_nodes.rs"
+
 [dependencies]
 dt-agent    = { path = "../../crates/dt-agent" }
 dt-behavior = { path = "../../crates/dt-behavior" }
 dt-core     = { path = "../../crates/dt-core" }
+dt-mobility = { path = "../../crates/dt-mobility" }
+dt-output   = { path = "../../crates/dt-output" }
 dt-schedule = { path = "../../crates/dt-schedule" }
 dt-sim      = { path = "../../crates/dt-sim", features = ["parallel"] }
 dt-spatial  = { path = "../../crates/dt-spatial" }
 anyhow      = "1"
+mimalloc    = { version = "0.1", default-features = false }
+serde_json  = "1"

@@ -1,9 +1,11 @@
-//! Mobile, AL — MVP example for the rust_dt digital twin framework.
+//! xsmall — smallest example for the rust_dt digital twin framework.
 //!
 //! Simulates 8 agents commuting across a synthetic 5-node road network
 //! inspired by the geography of Mobile, Alabama.  Scale comment:
 //! the real population is ~400 K; swap AGENT_COUNT and a real OSM network
 //! to run at full scale on a 50-core workstation.
+
+mod network;
 
 use std::io::Cursor;
 use std::path::Path;
@@ -13,11 +15,13 @@ use anyhow::Result;
 
 use dt_agent::AgentStoreBuilder;
 use dt_behavior::{BehaviorModel, Intent, SimContext};
-use dt_core::{AgentId, AgentRng, GeoPoint, NodeId, SimConfig, TransportMode};
+use dt_core::{AgentId, AgentRng, NodeId, SimConfig, TransportMode};
 use dt_output::{CsvWriter, SimOutputObserver};
 use dt_schedule::{Destination, load_plans_reader};
 use dt_sim::{SimBuilder, SimObserver};
-use dt_spatial::{DijkstraRouter, RoadNetwork, RoadNetworkBuilder};
+use dt_spatial::DijkstraRouter;
+
+use network::build_network;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -25,7 +29,7 @@ const AGENT_COUNT:           usize = 8;
 const SEED:                  u64   = 42;
 const TICK_DURATION_SECS:    u32   = 3_600; // 1 tick = 1 hour
 const SIM_DAYS:              u64   = 7;
-const OUTPUT_INTERVAL_TICKS: u64   = 24;    // snapshot once per day
+const OUTPUT_INTERVAL_TICKS: u64   = 1;     // snapshot every tick (captures commute movement)
 
 // ── Application components ────────────────────────────────────────────────────
 
@@ -67,33 +71,6 @@ agent_id,activity_id,start_offset_ticks,duration_ticks,destination,cycle_ticks\n
 7,1,8,9,work,24\n\
 7,0,17,7,home,24\n\
 ";
-
-// ── Road network ──────────────────────────────────────────────────────────────
-
-/// Build the 5-node Mobile, AL–inspired road network.
-///
-/// Returns `(network, [north_residential, south_residential, downtown,
-/// commerce_park, connector])`.
-fn build_network() -> (RoadNetwork, [NodeId; 5]) {
-    let mut b = RoadNetworkBuilder::new();
-
-    let north_residential = b.add_node(GeoPoint::new(30.710, -88.070));
-    let south_residential = b.add_node(GeoPoint::new(30.670, -88.030));
-    let downtown          = b.add_node(GeoPoint::new(30.695, -88.050));
-    let commerce_park     = b.add_node(GeoPoint::new(30.700, -88.030));
-    let connector         = b.add_node(GeoPoint::new(30.680, -88.060));
-
-    // Bidirectional roads, ~45 km/h urban speed.
-    b.add_road(north_residential, downtown,      2_500.0, 200_000);
-    b.add_road(north_residential, connector,     1_500.0, 120_000);
-    b.add_road(connector,         downtown,      1_000.0,  80_000);
-    b.add_road(south_residential, connector,     1_500.0, 120_000);
-    b.add_road(south_residential, commerce_park, 2_000.0, 160_000);
-    b.add_road(downtown,          commerce_park, 2_000.0, 160_000);
-
-    let net = b.build();
-    (net, [north_residential, south_residential, downtown, commerce_park, connector])
-}
 
 // ── Behavior model ────────────────────────────────────────────────────────────
 
@@ -170,7 +147,7 @@ impl<W: dt_output::writer::OutputWriter> SimObserver for CountingObserver<W> {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
-    println!("=== Mobile, AL digital twin — MVP ===");
+    println!("=== xsmall — rust_dt digital twin ===");
     println!("Agents: {AGENT_COUNT}  |  Days: {SIM_DAYS}  |  Seed: {SEED}");
     println!("(Scale to ~400 K agents + real OSM network for production run)");
     println!();
@@ -194,13 +171,13 @@ fn main() -> Result<()> {
     // Agents 5–7: home = south_residential, work = commerce_park.
     {
         let homes = store.component_mut::<HomeNode>().unwrap();
-        for i in 0..5 { homes[i] = HomeNode(north_residential); }
-        for i in 5..8 { homes[i] = HomeNode(south_residential); }
+        homes[..5].fill(HomeNode(north_residential));
+        homes[5..].fill(HomeNode(south_residential));
     }
     {
         let works = store.component_mut::<WorkNode>().unwrap();
-        for i in 0..5 { works[i] = WorkNode(downtown); }
-        for i in 5..8 { works[i] = WorkNode(commerce_park); }
+        works[..5].fill(WorkNode(downtown));
+        works[5..].fill(WorkNode(commerce_park));
     }
 
     // 3. Load plans from the embedded schedule CSV.
@@ -240,8 +217,8 @@ fn main() -> Result<()> {
         .build()?;
 
     // 7. Set up output.
-    std::fs::create_dir_all("output")?;
-    let writer = CsvWriter::new(Path::new("output"))?;
+    std::fs::create_dir_all("output/xsmall")?;
+    let writer = CsvWriter::new(Path::new("output/xsmall"))?;
     let inner_obs = SimOutputObserver::new(writer, &config);
     let mut obs = CountingObserver::new(inner_obs);
 

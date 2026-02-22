@@ -8,7 +8,7 @@ members = [
     "crates/dt-mobility",
     "crates/dt-sim",
     "crates/dt-output",
-    "examples/mobile_al",
+    "examples/xsmall",
     "examples/large",
     "examples/xlarge",
 ]
