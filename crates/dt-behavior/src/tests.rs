@@ -1,11 +1,11 @@
 //! Unit tests for dt-behavior.
 
 use dt_agent::{AgentStore, AgentStoreBuilder};
-use dt_core::{AgentId, AgentRng, Tick, TransportMode};
+use dt_core::{AgentId, AgentRng, NodeId, Tick, TransportMode};
 use dt_schedule::ActivityPlan;
 
 use crate::{
-    BehaviorModel, ContactEvent, ContactKind, Intent, NoopBehavior, SimContext,
+    BehaviorModel, Intent, NoopBehavior, SimContext,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -82,38 +82,6 @@ mod context_tests {
     }
 }
 
-// ── ContactEvent ──────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod contact_tests {
-    use dt_core::NodeId;
-
-    use super::*;
-
-    #[test]
-    fn contact_event_fields() {
-        let ev = ContactEvent {
-            other:    AgentId(1),
-            location: NodeId(5),
-            tick:     Tick(10),
-            kind:     ContactKind::Node,
-        };
-        assert_eq!(ev.other, AgentId(1));
-        assert_eq!(ev.kind, ContactKind::Node);
-    }
-
-    #[test]
-    fn edge_contact_kind() {
-        let ev = ContactEvent {
-            other:    AgentId(2),
-            location: NodeId(0),
-            tick:     Tick(1),
-            kind:     ContactKind::Edge,
-        };
-        assert_eq!(ev.kind, ContactKind::Edge);
-    }
-}
-
 // ── NoopBehavior ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -136,8 +104,7 @@ mod noop_tests {
         let plans = vec![ActivityPlan::empty()];
         let ctx = make_context(&store, &plans);
         let mut rng = AgentRng::new(0, AgentId(0));
-        let contacts = vec![];
-        let intents = NoopBehavior.on_contacts(AgentId(0), &contacts, &ctx, &mut rng);
+        let intents = NoopBehavior.on_contacts(AgentId(0), NodeId(0), &[], &ctx, &mut rng);
         assert!(intents.is_empty());
     }
 

@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use dt_agent::AgentStoreBuilder;
-use dt_behavior::{BehaviorModel, ContactEvent, Intent, NoopBehavior, SimContext};
+use dt_behavior::{BehaviorModel, Intent, NoopBehavior, SimContext};
 use dt_core::{AgentId, AgentRng, GeoPoint, NodeId, SimConfig, Tick, TransportMode};
 use dt_schedule::{ActivityPlan, ScheduledActivity, Destination};
 use dt_spatial::{DijkstraRouter, RoadNetworkBuilder};
@@ -627,12 +627,14 @@ mod contact_tests {
 
             fn on_contacts(
                 &self,
-                _a:        AgentId,
-                contacts:  &[ContactEvent],
-                _ctx:      &SimContext<'_>,
-                _rng:      &mut AgentRng,
+                agent:           AgentId,
+                _node:           NodeId,
+                agents_at_node:  &[AgentId],
+                _ctx:            &SimContext<'_>,
+                _rng:            &mut AgentRng,
             ) -> Vec<Intent> {
-                self.0.fetch_add(contacts.len(), Ordering::SeqCst);
+                let count = agents_at_node.iter().filter(|&&a| a != agent).count();
+                self.0.fetch_add(count, Ordering::SeqCst);
                 vec![]
             }
         }
@@ -679,12 +681,14 @@ mod contact_tests {
 
             fn on_contacts(
                 &self,
-                _a:       AgentId,
-                contacts: &[ContactEvent],
-                _ctx:     &SimContext<'_>,
-                _rng:     &mut AgentRng,
+                agent:           AgentId,
+                _node:           NodeId,
+                agents_at_node:  &[AgentId],
+                _ctx:            &SimContext<'_>,
+                _rng:            &mut AgentRng,
             ) -> Vec<Intent> {
-                self.0.fetch_add(contacts.len(), Ordering::SeqCst);
+                let count = agents_at_node.iter().filter(|&&a| a != agent).count();
+                self.0.fetch_add(count, Ordering::SeqCst);
                 vec![]
             }
         }
@@ -729,12 +733,14 @@ mod contact_tests {
             }
             fn on_contacts(
                 &self,
-                _a:       AgentId,
-                contacts: &[ContactEvent],
-                _ctx:     &SimContext<'_>,
-                _rng:     &mut AgentRng,
+                agent:           AgentId,
+                _node:           NodeId,
+                agents_at_node:  &[AgentId],
+                _ctx:            &SimContext<'_>,
+                _rng:            &mut AgentRng,
             ) -> Vec<Intent> {
-                self.0.fetch_add(contacts.len(), Ordering::SeqCst);
+                let count = agents_at_node.iter().filter(|&&a| a != agent).count();
+                self.0.fetch_add(count, Ordering::SeqCst);
                 vec![]
             }
         }

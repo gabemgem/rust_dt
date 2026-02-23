@@ -1,8 +1,8 @@
 //! The `BehaviorModel` trait — the main extension point for user code.
 
-use dt_core::{AgentId, AgentRng};
+use dt_core::{AgentId, AgentRng, NodeId};
 
-use crate::{ContactEvent, Intent, SimContext};
+use crate::{Intent, SimContext};
 
 /// Pluggable agent behavior.
 ///
@@ -53,15 +53,20 @@ pub trait BehaviorModel: Send + Sync + 'static {
         rng:   &mut AgentRng,
     ) -> Vec<Intent>;
 
-    /// Called when one or more contacts were observed for this agent.
+    /// Called when co-located agents are present at this agent's current node.
+    ///
+    /// `agents_at_node` is the raw slice of all stationary agents at that node,
+    /// **including `agent` itself** — filter `agent` out if you only want neighbors.
+    /// The slice is borrowed directly from the contact index; no allocation occurs.
     ///
     /// Default: returns no intents (contacts are ignored).
     fn on_contacts(
         &self,
-        _agent:    AgentId,
-        _contacts: &[ContactEvent],
-        _ctx:      &SimContext<'_>,
-        _rng:      &mut AgentRng,
+        _agent:          AgentId,
+        _node:           NodeId,
+        _agents_at_node: &[AgentId],
+        _ctx:            &SimContext<'_>,
+        _rng:            &mut AgentRng,
     ) -> Vec<Intent> {
         vec![]
     }

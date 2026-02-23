@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use dt_agent::{AgentRngs, AgentStore};
-use dt_behavior::{BehaviorModel, ContactEvent, ContactKind, Intent, SimContext};
+use dt_behavior::{BehaviorModel, Intent, SimContext};
 use dt_core::{AgentId, NodeId, SimClock, SimConfig, Tick};
 use dt_mobility::{MobilityEngine, MobilityStore};
 use dt_schedule::{ActivityPlan, WakeQueue};
@@ -160,12 +160,10 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
         // so the intent phase (which may run in parallel) only reads
         // immutable data.
         //
-        // Contact lists are NOT collected here.  Instead, `contacts_for_agent`
-        // is called lazily inside `compute_intents` — one ephemeral Vec per
-        // agent, created and dropped within the same closure.  This keeps
-        // peak memory O(threads × contacts_per_agent) rather than
-        // O(woken × contacts_per_agent), which is critical when many agents
-        // share a small number of nodes.
+        // Contact lists are NOT collected here.  They are looked up lazily
+        // inside `compute_intents` — the contact index is a shared read-only
+        // `HashMap` and each agent's slice is borrowed directly from it with
+        // zero allocation.
         //
         // Messages sent *this tick* (during the apply phase below) will be
         // delivered at the recipient's *next* wake — not this one.
@@ -178,7 +176,7 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
             .collect();
 
         // ── Phase 4: intent phase (produce) ───────────────────────────────
-        let intents = self.compute_intents(now, &woken, inputs, contact_index);
+        let intents = self.compute_intents(&woken, inputs, contact_index);
 
         // ── Phase 5: apply phase (consume) ────────────────────────────────
         //
@@ -199,7 +197,6 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
     /// thread pool.
     fn compute_intents(
         &mut self,
-        now:           Tick,
         woken:         &[AgentId],
         inputs:        Vec<AgentInputs>,
         contact_index: HashMap<NodeId, Vec<AgentId>>,
@@ -212,7 +209,7 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
         let rngs     = &mut self.rngs;
         let mobility = &self.mobility.store;
 
-        let ctx = SimContext::new(now, tick_dur, agents, plans);
+        let ctx = SimContext::new(self.clock.current_tick, tick_dur, agents, plans);
 
         #[cfg(not(feature = "parallel"))]
         {
@@ -226,11 +223,19 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
                     for (from, payload) in input.messages {
                         intents.extend(behavior.on_message(agent, from, &payload, &ctx, rng));
                     }
-                    // Contacts are materialised lazily here — the Vec is
-                    // created, used, and dropped within this closure.
-                    let contacts = contacts_for_agent(agent, &contact_index, mobility, now);
-                    if !contacts.is_empty() {
-                        intents.extend(behavior.on_contacts(agent, &contacts, &ctx, rng));
+
+                    // Pass the raw agents-at-node slice directly — zero allocation.
+                    // The slice includes `agent` itself; behavior filters self if needed.
+                    let state = &mobility.states[agent.index()];
+                    if !state.in_transit && state.departure_node != NodeId::INVALID {
+                        let node = state.departure_node;
+                        if let Some(agents_at_node) = contact_index.get(&node) {
+                            if agents_at_node.len() > 1 {
+                                intents.extend(behavior.on_contacts(
+                                    agent, node, agents_at_node, &ctx, rng,
+                                ));
+                            }
+                        }
                     }
 
                     (agent, intents)
@@ -256,11 +261,19 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
                     for (from, payload) in input.messages {
                         intents.extend(behavior.on_message(agent, from, &payload, &ctx, rng));
                     }
-                    // Contacts are materialised lazily here — the Vec is
-                    // created, used, and dropped within this Rayon task.
-                    let contacts = contacts_for_agent(agent, &contact_index, mobility, now);
-                    if !contacts.is_empty() {
-                        intents.extend(behavior.on_contacts(agent, &contacts, &ctx, rng));
+
+                    // Pass the raw agents-at-node slice directly — zero allocation.
+                    // The slice includes `agent` itself; behavior filters self if needed.
+                    let state = &mobility.states[agent.index()];
+                    if !state.in_transit && state.departure_node != NodeId::INVALID {
+                        let node = state.departure_node;
+                        if let Some(agents_at_node) = contact_index.get(&node) {
+                            if agents_at_node.len() > 1 {
+                                intents.extend(behavior.on_contacts(
+                                    agent, node, agents_at_node, &ctx, rng,
+                                ));
+                            }
+                        }
                     }
 
                     (agent, intents)
@@ -362,31 +375,3 @@ fn build_contact_index(store: &MobilityStore) -> HashMap<NodeId, Vec<AgentId>> {
     index
 }
 
-/// Return all agents co-located with `agent` at its current node.
-///
-/// Returns an empty vec if `agent` is in transit, unplaced, or alone.
-fn contacts_for_agent(
-    agent:  AgentId,
-    index:  &HashMap<NodeId, Vec<AgentId>>,
-    store:  &MobilityStore,
-    now:    Tick,
-) -> Vec<ContactEvent> {
-    let state = &store.states[agent.index()];
-    if state.in_transit || state.departure_node == NodeId::INVALID {
-        return vec![];
-    }
-    let node = state.departure_node;
-    match index.get(&node) {
-        None => vec![],
-        Some(agents_at_node) => agents_at_node
-            .iter()
-            .filter(|&&other| other != agent)
-            .map(|&other| ContactEvent {
-                other,
-                location: node,
-                tick:     now,
-                kind:     ContactKind::Node,
-            })
-            .collect(),
-    }
-}

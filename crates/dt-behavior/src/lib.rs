@@ -6,7 +6,6 @@
 //! |-------------|-----------------------------------------------------------------|
 //! | [`intent`]  | `Intent` enum (`TravelTo`, `WakeAt`, `SendMessage`)             |
 //! | [`context`] | `SimContext<'a>` — read-only tick snapshot shared by all agents |
-//! | [`contact`] | `ContactEvent`, `ContactKind`                                   |
 //! | [`model`]   | `BehaviorModel` trait                                           |
 //! | [`noop`]    | `NoopBehavior` — placeholder that never produces intents        |
 //! | [`error`]   | `BehaviorError`, `BehaviorResult<T>`                            |
@@ -25,7 +24,6 @@
 //! This split means `BehaviorModel` only needs to be `Send + Sync` — it never
 //! holds mutable state that could cause data races.
 
-pub mod contact;
 pub mod context;
 pub mod error;
 pub mod intent;
@@ -35,7 +33,6 @@ pub mod noop;
 #[cfg(test)]
 mod tests;
 
-pub use contact::{ContactEvent, ContactKind};
 pub use context::SimContext;
 pub use error::{BehaviorError, BehaviorResult};
 pub use intent::Intent;

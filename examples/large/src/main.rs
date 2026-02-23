@@ -15,6 +15,8 @@ mod network;
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use anyhow::Result;
@@ -65,7 +67,9 @@ struct WorkNode(NodeId);
 
 // ── Behavior model ────────────────────────────────────────────────────────────
 
-struct DailyCommuteBehavior;
+struct DailyCommuteBehavior {
+    contacts_observed: Arc<AtomicU64>,
+}
 
 impl BehaviorModel for DailyCommuteBehavior {
     fn replan(&self, agent: AgentId, ctx: &SimContext<'_>, _rng: &mut AgentRng) -> Vec<Intent> {
@@ -92,6 +96,38 @@ impl BehaviorModel for DailyCommuteBehavior {
         }
 
         vec![Intent::TravelTo { destination: dest, mode: TransportMode::Car }]
+    }
+
+    fn on_contacts(
+        &self,
+        agent:          AgentId,
+        _node:          NodeId,
+        agents_at_node: &[AgentId],
+        _ctx:           &SimContext<'_>,
+        rng:            &mut AgentRng,
+    ) -> Vec<Intent> {
+        // Reservoir-sample up to 4 neighbors (excluding self).
+        // O(n) time, O(1) space — no heap allocation.
+        let mut sample = [AgentId(u32::MAX); 4];
+        let mut k = 0usize;
+        let mut seen = 0usize;
+        for &other in agents_at_node {
+            if other == agent { continue; }
+            if k < 4 {
+                sample[k] = other;
+                k += 1;
+            } else {
+                let j = rng.gen_range(0..=seen);
+                if j < 4 {
+                    sample[j] = other;
+                }
+            }
+            seen += 1;
+        }
+        // `sample[..k]` holds the chosen contacts — available for downstream use.
+        let _ = &sample[..k];
+        self.contacts_observed.fetch_add(k as u64, Ordering::Relaxed);
+        vec![]
     }
 }
 
@@ -319,7 +355,12 @@ fn main() -> Result<()> {
     println!();
 
     // 7. Build sim.
-    let mut sim = SimBuilder::new(config.clone(), store, rngs, DailyCommuteBehavior, router)
+    let contacts_observed = Arc::new(AtomicU64::new(0));
+    let mut sim = SimBuilder::new(
+            config.clone(), store, rngs,
+            DailyCommuteBehavior { contacts_observed: Arc::clone(&contacts_observed) },
+            router,
+        )
         .plans(plans)
         .network(network)
         .initial_positions(initial_positions)
@@ -351,6 +392,11 @@ fn main() -> Result<()> {
         "Throughput: {:.1} M wakeups/s  (total {})",
         obs.total_wakeups as f64 / elapsed / 1_000_000.0,
         obs.total_wakeups,
+    );
+    println!(
+        "Contacts sampled:   {} total  ({:.1} M/s)",
+        contacts_observed.load(Ordering::Relaxed),
+        contacts_observed.load(Ordering::Relaxed) as f64 / elapsed / 1_000_000.0,
     );
 
     Ok(())
