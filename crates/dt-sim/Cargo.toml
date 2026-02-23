@@ -9,6 +9,9 @@ default  = []
 # Enable Rayon parallel intent phase.  Requires that BehaviorModel is Sync
 # (it already is — the trait bound is Send + Sync + 'static).
 parallel = ["dep:rayon"]
+# Replace SipHash with FxHash for the per-tick contact index.
+# Speeds up the O(N) build_contact_index scan by ~20–50% on integer keys.
+fx-hash  = ["dep:rustc-hash"]
 
 [dependencies]
 dt-core     = { path = "../dt-core" }
@@ -19,3 +22,4 @@ dt-behavior = { path = "../dt-behavior" }
 dt-mobility = { path = "../dt-mobility" }
 thiserror   = { workspace = true }
 rayon       = { workspace = true, optional = true }
+rustc-hash  = { workspace = true, optional = true }

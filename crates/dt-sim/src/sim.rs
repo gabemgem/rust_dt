@@ -2,6 +2,19 @@
 
 use std::collections::HashMap;
 
+#[cfg(feature = "fx-hash")]
+use rustc_hash::FxHashMap;
+
+/// HashMap type used for the per-tick contact index.
+///
+/// Switched to `FxHashMap` when the `fx-hash` feature is enabled.
+/// `FxHashMap` uses a non-cryptographic multiply-xor hash that is
+/// 3–4× faster than SipHash on dense integer keys (`NodeId` is `u32`).
+#[cfg(feature = "fx-hash")]
+type ContactIndex = FxHashMap<NodeId, Vec<AgentId>>;
+#[cfg(not(feature = "fx-hash"))]
+type ContactIndex = HashMap<NodeId, Vec<AgentId>>;
+
 use dt_agent::{AgentRngs, AgentStore};
 use dt_behavior::{BehaviorModel, Intent, SimContext};
 use dt_core::{AgentId, NodeId, SimClock, SimConfig, Tick};
@@ -199,7 +212,7 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
         &mut self,
         woken:         &[AgentId],
         inputs:        Vec<AgentInputs>,
-        contact_index: HashMap<NodeId, Vec<AgentId>>,
+        contact_index: ContactIndex,
     ) -> Vec<(AgentId, Vec<Intent>)> {
         // Explicit field borrows so the borrow checker sees disjoint access.
         let agents   = &self.agents;
@@ -362,8 +375,20 @@ impl<B: BehaviorModel, R: Router> Sim<B, R> {
 ///
 /// In-transit agents and agents at `NodeId::INVALID` are excluded.
 /// Time complexity: O(agent_count).
-fn build_contact_index(store: &MobilityStore) -> HashMap<NodeId, Vec<AgentId>> {
-    let mut index: HashMap<NodeId, Vec<AgentId>> = HashMap::new();
+fn build_contact_index(store: &MobilityStore) -> ContactIndex {
+    // Capacity hint: assume agents are roughly evenly spread across nodes.
+    // Over-allocating slightly is fine; it avoids rehashing during the bulk
+    // insert.  Divide by 100 as a conservative estimate of distinct nodes
+    // (the 100-node grid puts ~10 K agents per node at 1 M agents).
+    let n_agents = store.states.len();
+    #[cfg(feature = "fx-hash")]
+    let mut index: FxHashMap<NodeId, Vec<AgentId>> = FxHashMap::with_capacity_and_hasher(
+        n_agents / 100,
+        Default::default(),
+    );
+    #[cfg(not(feature = "fx-hash"))]
+    let mut index: HashMap<NodeId, Vec<AgentId>> = HashMap::with_capacity(n_agents / 100);
+
     for (i, state) in store.states.iter().enumerate() {
         if !state.in_transit && state.departure_node != NodeId::INVALID {
             index

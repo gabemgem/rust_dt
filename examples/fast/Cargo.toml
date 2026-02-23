@@ -1,0 +1,24 @@
+[package]
+name        = "fast"
+version     = "0.1.0"
+edition     = "2024"
+default-run = "fast"
+
+[[bin]]
+name = "fast"
+path = "src/main.rs"
+
+[dependencies]
+dt-agent    = { path = "../../crates/dt-agent" }
+dt-behavior = { path = "../../crates/dt-behavior" }
+dt-core     = { path = "../../crates/dt-core" }
+dt-mobility = { path = "../../crates/dt-mobility" }
+dt-output   = { path = "../../crates/dt-output" }
+dt-schedule = { path = "../../crates/dt-schedule" }
+dt-sim      = { path = "../../crates/dt-sim", features = ["parallel", "fx-hash"] }
+dt-spatial  = { path = "../../crates/dt-spatial" }
+anyhow        = "1"
+memory-stats  = "1"
+mimalloc      = { version = "0.1", default-features = false }
+rayon         = { workspace = true }
+rustc-hash    = { workspace = true }

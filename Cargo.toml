@@ -11,12 +11,14 @@ members = [
     "examples/xsmall",
     "examples/large",
     "examples/xlarge",
+    "examples/fast",
 ]
 resolver = "2"
 
 # Workspace-level dependency versions — sub-crates reference these to stay in sync.
 [workspace.dependencies]
 rand        = { version = "0.8", features = ["small_rng"] }
+rustc-hash  = "2"
 thiserror   = "1"
 serde       = { version = "1", features = ["derive"] }
 rstar       = "0.12"
@@ -25,3 +27,16 @@ rayon       = "1"
 rusqlite    = { version = "0.31", features = ["bundled"] }
 arrow       = "53"
 parquet     = { version = "53", features = ["arrow"] }
+
+# ── Release profiles ──────────────────────────────────────────────────────────
+
+[profile.release]
+opt-level     = 3
+codegen-units = 1       # single CGU → whole-program inlining across all crates
+lto           = "thin"  # cross-crate dead-code elimination; faster than "fat"
+panic         = "abort"  # removes unwinding machinery from every stack frame
+
+# `cargo run/build --profile fast` — fat LTO for maximum throughput benchmarking.
+[profile.fast]
+inherits      = "release"
+lto           = "fat"

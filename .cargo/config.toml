@@ -1,0 +1,8 @@
+# Workspace-level Cargo configuration.
+#
+# `target-cpu=native` lets the compiler emit AVX2/AVX-512 instructions for the
+# current machine.  This is intentional — rust_dt targets a specific workstation
+# and does not need portable binaries.  Remove this file (or override with
+# RUSTFLAGS="") if you need to build a binary for a different CPU.
+[build]
+rustflags = ["-C", "target-cpu=native"]
