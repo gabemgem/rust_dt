@@ -16,14 +16,39 @@ const INITIAL_VIEW = {
 
 const BASEMAP = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
 
+// u32::MAX sentinel written by the Rust sim for "no destination"
+const INVALID_NODE = 0xFFFFFFFF
+
 // Deterministic jitter so co-located agents spread into a small circle (~60 m radius).
-// Uses a simple hash of agent_id so positions are stable across ticks.
+// Uses a simple hash of agent_id so positions are stable across ticks and during
+// GPU-side transitions (the offset is baked into both keyframes, so it stays fixed).
 const JITTER_DEG = 0.0006
 function jitteredPosition(base: [number, number], agentId: number): [number, number] {
   const h = (agentId * 2654435761) >>> 0  // Knuth multiplicative hash
   const angle = (h & 0xFFFF) / 0xFFFF * 2 * Math.PI
   const r = JITTER_DEG * (0.4 + 0.6 * ((h >>> 16) & 0xFF) / 255)
   return [base[0] + Math.cos(angle) * r, base[1] + Math.sin(angle) * r]
+}
+
+// Visual position for an agent.
+//
+// The simulation stores agents at their *departure* node until arrival (teleport-at-arrival
+// model). For smooth frontend animation we instead display in-transit agents at their
+// *destination* node. Deck.gl's GPU transition then interpolates from the previous
+// keyframe position to this one over the duration of one playback tick, producing a
+// smooth glide without any per-frame JS work.
+//
+// Why this works across the state machine:
+//   stationary A  →  in_transit A→B  : prev=A, next=B  → glides A→B ✓
+//   in_transit A→B →  stationary B   : prev=B, next=B  → no jump   ✓  (already at B)
+//   in_transit A→B →  in_transit A→B : prev=B, next=B  → stays at B ✓  (long trip)
+//   stationary A  →  stationary A    : prev=A, next=A  → no movement ✓
+function visualPosition(d: AgentSnapshot, nodeMap: Map<number, [number, number]>): [number, number] {
+  const targetNode = (d.in_transit && d.destination_node !== INVALID_NODE)
+    ? d.destination_node
+    : d.departure_node
+  const base = nodeMap.get(targetNode) ?? ([0, 0] as [number, number])
+  return jitteredPosition(base, d.agent_id)
 }
 
 function agentColor(agent: AgentSnapshot): [number, number, number, number] {
@@ -37,24 +62,34 @@ export function MapPane() {
   const availableTicks = useStore((s) => s.availableTicks)
   const currentTickIndex = useStore((s) => s.currentTickIndex)
   const snapshotsByTick = useStore((s) => s.snapshotsByTick)
+  const speed = useStore((s) => s.speed)
+  const playing = useStore((s) => s.playing)
 
   const currentTick = availableTicks[currentTickIndex] ?? null
   const agents: AgentSnapshot[] =
     currentTick !== null ? (snapshotsByTick.get(currentTick) ?? []) : []
 
+  // Transition duration matches the playback rate so each tick's position change
+  // completes exactly as the next tick begins — giving the appearance of continuous
+  // movement. When paused or scrubbing, duration=0 gives instant position snapping.
+  const msPerTick = 1000 / speed
+  const transitionDuration = playing ? msPerTick : 0
+
   const agentLayer = new ScatterplotLayer<AgentSnapshot>({
     id: 'agents',
     data: agents,
-    getPosition: (d) => {
-      const base = nodeMap.get(d.departure_node) ?? ([0, 0] as [number, number])
-      return jitteredPosition(base, d.agent_id)
-    },
+    getPosition: (d) => visualPosition(d, nodeMap),
     getFillColor: agentColor,
     getRadius: 14,
     radiusUnits: 'pixels',
     pickable: true,
+    transitions: {
+      // Deck.gl interpolates the GPU position attribute from the previous keyframe
+      // to the new one. This is entirely GPU-side — no JS runs per frame.
+      getPosition: { duration: transitionDuration, easing: (t: number) => t },
+    },
     updateTriggers: {
-      getPosition: currentTick,
+      getPosition: [currentTick, transitionDuration],
       getFillColor: currentTick,
     },
   })
