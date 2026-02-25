@@ -298,10 +298,29 @@ impl RoadNetworkBuilder {
     pub fn node_count(&self) -> usize
     pub fn edge_count(&self) -> usize
     pub fn build(self) -> RoadNetwork   // O(E log E) + O(N log N)
-
-    // feature = "osm"
-    pub fn load_from_pbf(path: &Path) -> SpatialResult<RoadNetwork>
 }
+```
+
+---
+
+### `osm::load_from_pbf` *(feature: osm)*
+
+Free function in the `dt_spatial::osm` module. Performs a two-pass read of an OSM PBF file: first collecting all node coordinates, then building directed edges from car-drivable `highway=*` ways.
+
+```rust
+// in dt_spatial::osm
+pub fn load_from_pbf(path: &Path) -> SpatialResult<RoadNetwork>
+```
+
+- Only car-drivable road types are included (see guide for speed table)
+- `oneway=yes` and motorways add a single directed edge; all others add both directions
+- Does not parse `maxspeed` tags — speeds are conservative urban defaults
+- Memory: buffers all OSM node coords in a `HashMap<i64, GeoPoint>` during phase 1 (~100–200 MB for a city); freed before R-tree construction
+
+```rust
+use dt_spatial::osm::load_from_pbf;
+
+let network = load_from_pbf(Path::new("city.osm.pbf"))?;
 ```
 
 ---

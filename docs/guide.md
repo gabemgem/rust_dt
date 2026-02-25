@@ -998,29 +998,52 @@ Set `output_interval_ticks` to a larger value and/or sample agents in your obser
 
 ## 13. Loading Real OSM Networks
 
-Enable the `osm` feature on `dt-spatial`:
+The `dt-spatial` crate includes a full OSM PBF loader behind the `osm` feature flag. It performs a two-pass read: first collecting all node coordinates, then building directed edges from car-drivable `highway=*` ways. One-way roads (explicit `oneway=yes` tags, plus motorways by convention) add a single directed edge; two-way roads add both directions.
+
+**Enable the feature:**
 
 ```toml
 dt-spatial = { path = "...", features = ["osm"] }
 ```
 
+**Load a network:**
+
 ```rust
 use std::path::Path;
-use dt_spatial::RoadNetworkBuilder;
+use dt_spatial::osm::load_from_pbf;
 
-let network = RoadNetworkBuilder::load_from_pbf(Path::new("my_city.osm.pbf"))?;
+let network = load_from_pbf(Path::new("my_city.osm.pbf"))?;
 println!("{} nodes, {} edges loaded from OSM", network.node_count(), network.edge_count());
 ```
 
 OSM PBF files can be downloaded from [Geofabrik](https://download.geofabrik.de/) or [BBBike](https://download.bbbike.org/). For a city-sized area (~400 K population), a typical PBF file is 20–100 MB and loads in a few seconds.
 
-After loading, snap agent home/work locations to the nearest network node:
+**Supported highway types and assumed speeds:**
+
+| OSM tag | Speed |
+|---------|-------|
+| `motorway` / `motorway_link` | 65 mph (29.1 m/s) |
+| `trunk` / `trunk_link` | 55 mph (24.6 m/s) |
+| `primary` / `primary_link` | 45 mph (20.1 m/s) |
+| `secondary` / `secondary_link` | 40 mph (17.9 m/s) |
+| `tertiary` / `tertiary_link` | 30 mph (13.4 m/s) |
+| `residential` / `living_street` | 20 mph (8.9 m/s) |
+| `service` / `unclassified` | 15 mph (6.7 m/s) |
+| `footway`, `path`, `cycleway`, `pedestrian`, `steps`, `track` | excluded |
+
+These are conservative urban defaults. The loader does not currently parse `maxspeed` tags — if you need speed-limit-accurate travel times, use `RoadNetworkBuilder` directly and populate `edge_travel_ms` from your own OSM parsing.
+
+**Snap agent home/work locations to the network:**
 
 ```rust
+use dt_core::GeoPoint;
+
 let home_gps = GeoPoint::new(30.694, -88.043);
 let home_node = network.snap_to_node(home_gps)
     .expect("no nodes in network near this coordinate");
 ```
+
+**Memory note:** The loader buffers all OSM node coordinates in a `HashMap<i64, GeoPoint>` during the first pass (needed because OSM ways reference nodes by integer ID). For a city-scale PBF this is roughly 100–200 MB. The map is freed before the R-tree is built.
 
 ---
 
